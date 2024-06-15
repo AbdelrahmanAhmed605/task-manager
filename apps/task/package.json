@@ -1,0 +1,21 @@
+{
+  "name": "@task-manager/task-service",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev src/index.ts"
+  },
+  "dependencies": {
+    "express": "*",
+    "aws-sdk": "*",
+    "body-parser": "*"
+  },
+  "devDependencies": {
+    "typescript": "*",
+    "ts-node-dev": "*",
+    "@types/express": "*",
+    "@types/node": "*"
+  }
+}

@@ -1,0 +1,46 @@
+# Node modules
+node_modules/
+
+# Yarn integrity file
+.yarn-integrity
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Dependency directories
+packages/*/node_modules
+apps/*/node_modules
+
+# Production
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.*.local
+
+# Local IDE configurations
+.vscode/
+.idea/
+
+# MacOS
+.DS_Store
+
+# Log files
+*.log
+
+# Temporary directories and files
+temp/
+tmp/
+*.tmp
+
+# Ignore coverage reports
+coverage/
+
+# Ignore yarn error log
+yarn-error.log
