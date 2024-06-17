@@ -38,7 +38,7 @@ The Task Management Application provides the following features:
 
 ## Architecture Diagram
 
-![AWS (2019) horizontal framework - Page 1](https://github.com/AbdelrahmanAhmed605/task-manager/assets/98119874/9691e027-9c34-43d3-ac60-86b6e704cf8e)
+![AWS (2019) horizontal framework - Page 1](https://github.com/AbdelrahmanAhmed605/task-manager/assets/98119874/6778218c-7755-4400-b411-0d05c4073d01)
 
 
 ## DynamoDB Schema Overview
@@ -114,7 +114,7 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
 
 ### High-Level Overview
 
-![AWS (2019) horizontal framework](https://github.com/AbdelrahmanAhmed605/task-manager/assets/98119874/5c1fed18-7901-45d1-85b6-58c4c3a500fe)
+![AWS (2019) horizontal framework](https://github.com/AbdelrahmanAhmed605/task-manager/assets/98119874/6eef05a6-9d73-47ae-b33f-e497a8a8dbd2)
 
 
 ### 1. User Registration and Authentication:
