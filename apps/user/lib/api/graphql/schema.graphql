@@ -1,0 +1,27 @@
+type User {
+  userId: ID!
+  email: String!
+  firstName: String
+  lastName: String
+  phoneNumber: String
+  notificationPreferences: NotificationPreferences
+  createdAt: String
+  updatedAt: String
+  lastLogin: String
+}
+
+# Notification Preferences Type
+type NotificationPreferences {
+  email: Boolean
+  SMS: Boolean
+}
+
+type Query {
+  getUser(userId: ID!): User
+  getUserByEmail(email: String!): User
+}
+
+type Mutation {
+  createUser(email: String!, firstName: String, lastName: String, phoneNumber: String): User
+  updateUser(userId: ID!, email: String, firstName: String, lastName: String, phoneNumber: String): User
+}
