@@ -10,6 +10,11 @@
     "@jridgewell/gen-mapping" "^0.3.5"
     "@jridgewell/trace-mapping" "^0.3.24"
 
+"@aws-appsync/utils@^1.8.0":
+  version "1.8.0"
+  resolved "https://registry.yarnpkg.com/@aws-appsync/utils/-/utils-1.8.0.tgz#60323aa39cbbb0f6220a314e39f3d445fbefa854"
+  integrity sha512-X1WXyLypi37+RybNYFfbmKfaq/dAOLDTolKB51qsD+hmVbkPZAmPG/3Uxf+M76QNvxxYaPuqaP3SdU52xaBi8g==
+
 "@aws-cdk/asset-awscli-v1@^2.2.202":
   version "2.2.202"
   resolved "https://registry.yarnpkg.com/@aws-cdk/asset-awscli-v1/-/asset-awscli-v1-2.2.202.tgz#4627201d71f6a5c60db36385ce09cb81005f4b32"
@@ -924,6 +929,22 @@ aws-sdk@*:
   version "2.1642.0"
   resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.1642.0.tgz#d85e369258a4ba8fb6241bb8af3bd6c893ed51ee"
   integrity sha512-xTqRcLbb7F3GadFQN1+m25nP1twA2Lmlmhpt5gbYb3VCR91lb+c9EnsEr7U60zLv4AR2ip/GkDtSpKS/EzLOzA==
+  dependencies:
+    buffer "4.9.2"
+    events "1.1.1"
+    ieee754 "1.1.13"
+    jmespath "0.16.0"
+    querystring "0.2.0"
+    sax "1.2.1"
+    url "0.10.3"
+    util "^0.12.4"
+    uuid "8.0.0"
+    xml2js "0.6.2"
+
+aws-sdk@^2.1646.0:
+  version "2.1646.0"
+  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.1646.0.tgz#5616e367135d8b930cf850c2dc386dff8df984af"
+  integrity sha512-PAvDiR8ow3zjO0T5HMda04kXIzQ5e1zeWxWGSUodRwu9W569gZPBnqzcPX3PJFNAKBZnZBdbNgsci1g2nXCcBg==
   dependencies:
     buffer "4.9.2"
     events "1.1.1"
