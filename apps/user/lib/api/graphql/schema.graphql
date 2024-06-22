@@ -1,27 +1,63 @@
 type User {
-  userId: ID!
-  email: String!
-  firstName: String
-  lastName: String
-  phoneNumber: String
-  notificationPreferences: NotificationPreferences
-  createdAt: String
-  updatedAt: String
-  lastLogin: String
+  PK: String!
+  SK: String!
+  Email: String!
+  FirstName: String
+  LastName: String
+  PhoneNumber: String
+  NotificationPreferences: NotificationPreferences
+  CreatedAt: AWSDateTime
+  UpdatedAt: AWSDateTime
+  LastLogin: AWSDateTime
 }
 
-# Notification Preferences Type
 type NotificationPreferences {
-  email: Boolean
+  Email: Boolean
   SMS: Boolean
 }
 
+type GraphQLError {
+  message: String!
+  locations: [ErrorLocation]
+  path: [String]
+  extensions: AWSJSON
+}
+
+type ErrorLocation {
+  line: Int
+  column: Int
+}
+
+type Response {
+  success: Boolean!
+  errors: [GraphQLError]
+}
+
+input CreateUserInput {
+  Email: String!
+  FirstName: String
+  LastName: String
+  PhoneNumber: String
+}
+
+input NotificationPreferencesInput {
+  Email: Boolean
+  SMS: Boolean
+}
+
+input UpdateUserInput {
+  FirstName: String
+  LastName: String
+  PhoneNumber: String
+  NotificationPreferences: NotificationPreferencesInput
+}
+
 type Query {
-  getUser(userId: ID!): User
-  getUserByEmail(email: String!): User
+  getUserByEmail(Email: String!): User
+  getUserProfile: User
 }
 
 type Mutation {
-  createUser(email: String!, firstName: String, lastName: String, phoneNumber: String): User
-  updateUser(userId: ID!, email: String, firstName: String, lastName: String, phoneNumber: String): User
+  createUser(input: CreateUserInput!): Response
+  updateUser(input: UpdateUserInput!): Response
 }
