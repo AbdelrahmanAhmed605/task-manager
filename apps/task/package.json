@@ -5,17 +5,26 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node-dev src/index.ts"
+    "dev": "ts-node src/index.ts"
   },
   "dependencies": {
-    "express": "*",
-    "aws-sdk": "*",
-    "body-parser": "*"
+    "@aws-sdk/client-dynamodb": "^3.602.0",
+    "@aws-sdk/credential-providers": "^3.600.0",
+    "@aws-sdk/util-dynamodb": "^3.602.0",
+    "apollo-server-express": "^3.13.0",
+    "axios": "^1.7.2",
+    "body-parser": "^1.20.2",
+    "express": "^4.19.2",
+    "graphql": "^16.9.0",
+    "graphql-scalars": "^1.23.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwk-to-pem": "^2.0.5",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "typescript": "*",
-    "ts-node-dev": "*",
-    "@types/express": "*",
-    "@types/node": "*"
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/jwk-to-pem": "^2.0.3",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2"
   }
 }
