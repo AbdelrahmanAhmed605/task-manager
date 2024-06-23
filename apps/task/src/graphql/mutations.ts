@@ -2,6 +2,7 @@ import {
   DynamoDBClient,
   PutItemCommand,
   UpdateItemCommand,
+  UpdateItemCommandInput,
   DeleteItemCommand,
   ReturnValue,
 } from "@aws-sdk/client-dynamodb";
@@ -126,24 +127,15 @@ export const Mutation = {
       expressionAttributeValues[":dueDate"] = input.DueDate.toISOString();
     }
 
-    let params;
+    const params: UpdateItemCommandInput = {
+      TableName: process.env.DYNAMODB_TABLE_NAME!,
+      Key: marshall(itemKey),
+      UpdateExpression: updateExpression,
+      ExpressionAttributeValues: marshall(expressionAttributeValues),
+      ReturnValues: ReturnValue.ALL_NEW,
+    };
     if (Object.keys(expressionAttributeNames).length > 0) {
-      params = {
-        TableName: process.env.DYNAMODB_TABLE_NAME!,
-        Key: marshall(itemKey),
-        UpdateExpression: updateExpression,
-        ExpressionAttributeValues: marshall(expressionAttributeValues),
-        ExpressionAttributeNames: expressionAttributeNames,
-        ReturnValues: ReturnValue.ALL_NEW,
-      };
-    } else {
-      params = {
-        TableName: process.env.DYNAMODB_TABLE_NAME!,
-        Key: marshall(itemKey),
-        UpdateExpression: updateExpression,
-        ExpressionAttributeValues: marshall(expressionAttributeValues),
-        ReturnValues: ReturnValue.ALL_NEW,
-      };
+      params.ExpressionAttributeNames = expressionAttributeNames;
     }
 
     const command = new UpdateItemCommand(params);
