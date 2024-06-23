@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express from "express";
 import { ApolloServer, AuthenticationError } from "apollo-server-express";
 import AWS from "aws-sdk";
 import dotenv from "dotenv";
@@ -6,7 +6,6 @@ import bodyParser from "body-parser";
 import resolvers from "./graphql/resolvers";
 import { typeDefs } from "./graphql/TypeDefs";
 import CognitoExpress from "./auth/authMiddleware";
-import { authenticateUser } from "./auth/authenticate";
 
 // Load environment variables
 dotenv.config();
