@@ -3,6 +3,11 @@ import { gql } from "apollo-server-express";
 export const typeDefs = gql`
   scalar AWSDateTime
 
+  type GraphQLError {
+    key: String!
+    error: String!
+  }
+
   type Task {
     PK: String!
     SK: String!
@@ -17,20 +22,9 @@ export const typeDefs = gql`
     DueDate: AWSDateTime!
   }
 
-  type GraphQLError {
-    key: String!
-    error: String!
-  }
-
-  type MutationResponse {
-    success: Boolean!
-    Task: Task
-    errors: [GraphQLError]
-  }
-
-  type DeleteTaskResponse {
-    success: Boolean!
-    errors: [GraphQLError]
+  type PaginatedTasks {
+    tasks: [Task]
+    lastEvaluatedKey: String
   }
 
   input CreateTaskInput {
@@ -47,8 +41,19 @@ export const typeDefs = gql`
     DueDate: AWSDateTime
   }
 
+  type DeleteTaskResponse {
+    success: Boolean!
+    errors: [GraphQLError]
+  }
+
+  type MutationResponse {
+    success: Boolean!
+    Task: Task
+    errors: [GraphQLError]
+  }
+
   type Query {
-    tasks: [Task]
+    tasks(lastEvaluatedKey: String): PaginatedTasks
     task(taskId: String!): Task
   }
 

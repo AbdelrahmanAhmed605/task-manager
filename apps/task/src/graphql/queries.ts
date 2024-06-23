@@ -2,6 +2,7 @@ import {
   DynamoDBClient,
   QueryCommand,
   GetItemCommand,
+  QueryCommandInput
 } from "@aws-sdk/client-dynamodb";
 import { fromEnv } from "@aws-sdk/credential-providers";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
@@ -13,14 +14,18 @@ const client = new DynamoDBClient({
 });
 
 export const Query = {
-  tasks: async (_: any, __: any, context: any): Promise<any[] | undefined> => {
+  tasks: async (
+    _: any,
+    { lastEvaluatedKey }: { lastEvaluatedKey: Record<string, any> },
+    context: any
+  ): Promise<any | undefined> => {
     if (!process.env.DYNAMODB_TABLE_NAME) {
       throw new Error("Could not connect to database");
     }
 
     const userId = context?.user.username;
 
-    const params = {
+    const params: QueryCommandInput = {
       TableName: process.env.DYNAMODB_TABLE_NAME,
       IndexName: "UpdatedAtIndex",
       KeyConditionExpression: "PK = :pk",
@@ -30,15 +35,25 @@ export const Query = {
       ScanIndexForward: false,
     };
 
+    if (lastEvaluatedKey) {
+      params.ExclusiveStartKey = lastEvaluatedKey;
+    }
+
     const command = new QueryCommand(params);
 
     try {
       const response = await client.send(command);
       if (response.Items) {
         const tasks = response.Items.map((item) => unmarshall(item));
-        return tasks;
+        return {
+          tasks,
+          lastEvaluatedKey: response.LastEvaluatedKey || null,
+        };
       } else {
-        return [];
+        return {
+          tasks: [],
+          lastEvaluatedKey: null,
+        };
       }
     } catch (error) {
       console.error(error);
