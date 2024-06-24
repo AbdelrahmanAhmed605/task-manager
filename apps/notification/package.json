@@ -8,6 +8,9 @@
     "dev": "ts-node-dev src/index.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.602.0",
+    "@aws-sdk/credential-providers": "^3.600.0",
+    "@aws-sdk/util-dynamodb": "^3.602.0",
     "utils": "1.0.0"
   },
   "devDependencies": {}
