@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import resolvers from "./graphql/resolvers";
 import { typeDefs } from "./graphql/TypeDefs";
-import CognitoExpress from "./auth/authMiddleware";
+import { CognitoExpress } from "utils";
 
 // Load environment variables
 dotenv.config();
