@@ -2,7 +2,6 @@ import express from "express";
 import { ApolloServer, AuthenticationError } from "apollo-server-express";
 import AWS from "aws-sdk";
 import dotenv from "dotenv";
-import bodyParser from "body-parser";
 import resolvers from "./graphql/resolvers";
 import { typeDefs } from "./graphql/TypeDefs";
 import { CognitoExpress } from "utils";
@@ -45,7 +44,8 @@ async function startServer() {
   });
 
   const app = express();
-  app.use(bodyParser.json());
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
   await apolloServer.start();
   apolloServer.applyMiddleware({ app });
 
