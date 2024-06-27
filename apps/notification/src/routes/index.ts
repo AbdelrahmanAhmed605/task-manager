@@ -11,7 +11,7 @@ router.use("/lambda", lambdaApiRoutes);
 router.use("/health", healthRoutes);
 
 router.use((req, res) => {
-  res.send("<h1>Wrong Route!</h1>");
+  res.status(404).send("<h1>Wrong Route in /api/notifications!</h1>");
 });
 
 export default router;
