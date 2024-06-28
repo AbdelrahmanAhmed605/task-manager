@@ -47,12 +47,12 @@ async function startServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   await apolloServer.start();
-  apolloServer.applyMiddleware({ app });
+  apolloServer.applyMiddleware({ app, path: '/api/tasks/graphql' });
 
-  const port = process.env.PORT || 3333;
+  const port = process.env.PORT || 3000;
   const url = process.env.URL || "http://localhost";
   const server = app.listen(port, () => {
-    console.log(`Listening at ${url}:${port}/graphql`);
+    console.log(`Listening at ${url}:${port}/api/tasks/graphql`);
   });
   server.on("error", console.error);
 }
