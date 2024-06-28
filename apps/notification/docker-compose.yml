@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  notification:
+    container_name: notification
+    image: notification:latest
+    # Build configuration
+    build:      # Context of specified dockerfile is set to the monorepo root to allow us to add package.json from root into dockerfile
+      context: ../..
+      dockerfile: apps/notification/Dockerfile  # Path relative to the context
+    environment:
+      - PORT=3333              # Environment variable for the port
+    ports:
+      - "3333:3333"            # Map host port 3333 to container port 3333
+    env_file:
+      - .env                   # Load environment variables from .env file
+
