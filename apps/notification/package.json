@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "yarn workspace utils build && ts-node src/index.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.602.0",

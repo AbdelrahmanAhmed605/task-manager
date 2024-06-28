@@ -48,7 +48,7 @@ router.post(
 
       const item = {
         PK: `${userId}`,
-        SK: `Notification#${uuidv4()}`,
+        SK: `NOTIFICATION#${uuidv4()}`,
         Notif_Task: `${taskId}`,
         Notif_Timestamp: new Date().toISOString(),
         NotificationTTL: ttlTimestamp,
