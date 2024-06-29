@@ -17,7 +17,6 @@ export const typeDefs = gql`
     CreatedAt: AWSDateTime!
     TaskUpdatedAt: AWSDateTime
     TaskCompletedAt: AWSDateTime
-    DueDate_NotificationSent: String!
     NotificationSent: Boolean!
     DueDate: AWSDateTime!
   }
@@ -78,7 +77,6 @@ export interface Task {
   CreatedAt: string;
   TaskUpdatedAt?: string | null;
   TaskCompletedAt?: string | null;
-  DueDate_NotificationSent: string;
   NotificationSent: boolean;
   DueDate: string;
 }

@@ -43,9 +43,9 @@ export const Mutation = {
       Title: input.Title,
       Description: input.Description,
       Status: Status.TODO,
-      DueDate_NotificationSent: `${input.DueDate.toISOString()}_false`,
       NotificationSent: false,
       DueDate: input.DueDate.toISOString(),
+      DueDateShort: input.DueDate.toISOString().split('T')[0], // Only contains the date (YYYY-MM-DD) without the time, since querying in DynamoDB indexes can only use equal-to operation
       CreatedAt: new Date().toISOString(),
       TaskUpdatedAt: new Date().toISOString(),
     };
