@@ -123,8 +123,9 @@ export const Mutation = {
       }
     }
     if (input.DueDate !== undefined) {
-      updateExpression += ", DueDate = :dueDate";
+      updateExpression += ", DueDate = :dueDate, DueDateShort = :dueDateShort";
       expressionAttributeValues[":dueDate"] = input.DueDate.toISOString();
+      expressionAttributeValues[":dueDateShort"] = input.DueDate.toISOString().split('T')[0];
     }
 
     const params: UpdateItemCommandInput = {

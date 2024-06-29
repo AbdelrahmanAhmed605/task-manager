@@ -2,6 +2,7 @@ import { gql } from "apollo-server-express";
 
 export const typeDefs = gql`
   scalar AWSDateTime
+  scalar AWSDate
 
   type GraphQLError {
     key: String!
@@ -19,6 +20,7 @@ export const typeDefs = gql`
     TaskCompletedAt: AWSDateTime
     NotificationSent: Boolean!
     DueDate: AWSDateTime!
+    DueDateShort: AWSDate!
   }
 
   type PaginatedTasks {
@@ -79,6 +81,7 @@ export interface Task {
   TaskCompletedAt?: string | null;
   NotificationSent: boolean;
   DueDate: string;
+  DueDateShort: string;
 }
 
 export interface CreateTaskInput {
