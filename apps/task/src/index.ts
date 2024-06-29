@@ -1,6 +1,5 @@
 import express from "express";
 import { ApolloServer, AuthenticationError } from "apollo-server-express";
-import AWS from "aws-sdk";
 import dotenv from "dotenv";
 import resolvers from "./graphql/resolvers";
 import { typeDefs } from "./graphql/TypeDefs";
@@ -10,13 +9,6 @@ import { CognitoExpress } from "utils";
 dotenv.config();
 
 async function startServer() {
-  // Configure AWS SDK
-  AWS.config.update({
-    region: process.env.AWS_REGION,
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  });
-
   const cognitoExpress = new CognitoExpress({
     region: process.env.AWS_REGION,
     cognitoUserPoolId: process.env.AWS_COGNITO_USER_POOL_ID,
