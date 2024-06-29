@@ -40,12 +40,12 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true }));
 
   // Health check route
-  app.get('/api/tasks/health', (req, res) => {
-    res.status(200).send('OK');
+  app.get("/api/tasks/health", (req, res) => {
+    res.status(200).send("OK");
   });
 
   await apolloServer.start();
-  apolloServer.applyMiddleware({ app, path: '/api/tasks/graphql' });
+  apolloServer.applyMiddleware({ app, path: "/api/tasks/graphql" });
 
   const port = process.env.PORT || 3000;
   const url = process.env.URL || "http://localhost";
