@@ -38,6 +38,12 @@ async function startServer() {
   const app = express();
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+
+  // Health check route
+  app.get('/api/tasks/health', (req, res) => {
+    res.status(200).send('OK');
+  });
+
   await apolloServer.start();
   apolloServer.applyMiddleware({ app, path: '/api/tasks/graphql' });
 
