@@ -45,7 +45,7 @@ export const Mutation = {
       Status: Status.TODO,
       NotificationSent: false,
       DueDate: input.DueDate.toISOString(),
-      DueDateShort: input.DueDate.toISOString().split('T')[0], // Only contains the date (YYYY-MM-DD) without the time, since querying in DynamoDB indexes can only use equal-to operation
+      DueDateShort: input.DueDate.toISOString().split("T")[0], // Only contains the date (YYYY-MM-DD) without the time, since querying in DynamoDB indexes can only use equal-to operation
       CreatedAt: new Date().toISOString(),
       TaskUpdatedAt: new Date().toISOString(),
     };
@@ -90,10 +90,16 @@ export const Mutation = {
       throw new Error("Could not connect to database");
     }
 
-    const userId = context?.user.username;
+    const userId = context?.user?.username
+      ? `USER#${context.user.username}`
+      : input.UserId;
+
+    if (!userId || !input.TaskId) {
+      throw new Error("Invalid input: userId and taskId are required.");
+    }
 
     const itemKey = {
-      PK: `USER#${userId}`,
+      PK: userId,
       SK: `${input.TaskId}`,
     };
 
@@ -125,7 +131,8 @@ export const Mutation = {
     if (input.DueDate !== undefined) {
       updateExpression += ", DueDate = :dueDate, DueDateShort = :dueDateShort";
       expressionAttributeValues[":dueDate"] = input.DueDate.toISOString();
-      expressionAttributeValues[":dueDateShort"] = input.DueDate.toISOString().split('T')[0];
+      expressionAttributeValues[":dueDateShort"] =
+        input.DueDate.toISOString().split("T")[0];
     }
 
     const params: UpdateItemCommandInput = {

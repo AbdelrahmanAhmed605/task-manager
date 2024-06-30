@@ -21,6 +21,13 @@ async function startServer() {
     resolvers,
     context: async ({ req }) => {
       let accessTokenFromClient = req.headers.accesstoken;
+      const lambdaHeader = req.headers["x-lambda-header"];
+
+      // Allow access for lambda function
+      if (lambdaHeader && lambdaHeader === process.env.LAMBDA_TASKSERVICE_API_KEY) {
+        return { user: "lambda_function" };
+      }
+
       if (typeof accessTokenFromClient === "string") {
         try {
           const response = await cognitoExpress.validate(accessTokenFromClient);

@@ -35,6 +35,7 @@ export const typeDefs = gql`
   }
 
   input UpdateTaskInput {
+    UserId: String
     TaskId: String!
     Title: String
     Description: String
@@ -91,6 +92,7 @@ export interface CreateTaskInput {
 }
 
 export interface UpdateTaskInput {
+  UserId?: string;
   TaskId: string;
   Title?: string;
   Description?: string;
