@@ -41,6 +41,7 @@ export const typeDefs = gql`
     Description: String
     Status: String
     DueDate: AWSDateTime
+    NotificationSent: Boolean
   }
 
   type DeleteTaskResponse {
@@ -96,6 +97,7 @@ export interface UpdateTaskInput {
   TaskId: string;
   Title?: string;
   Description?: string;
+  NotificationSent?: boolean;
   Status?: string;
   DueDate?: Date;
   TaskCompletedAt?: string;

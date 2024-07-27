@@ -44,3 +44,5 @@ coverage/
 
 # Ignore yarn error log
 yarn-error.log
+
+venv/

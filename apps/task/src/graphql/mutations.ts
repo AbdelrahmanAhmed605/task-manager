@@ -118,6 +118,10 @@ export const Mutation = {
       updateExpression += ", Description = :description";
       expressionAttributeValues[":description"] = input.Description;
     }
+    if (input.NotificationSent !== undefined) {
+      updateExpression += ", NotificationSent = :notificationsent";
+      expressionAttributeValues[":notificationsent"] = input.NotificationSent;
+    }
     if (input.Status !== undefined) {
       updateExpression += ", #status = :status";
       expressionAttributeValues[":status"] = input.Status;
