@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { v4 as uuidv4 } from "uuid";
-import { fromInstanceMetadata } from "@aws-sdk/credential-providers";
+import { fromContainerMetadata } from "@aws-sdk/credential-providers";
 import { marshall } from "@aws-sdk/util-dynamodb";
 
 interface NotificationRequest {
@@ -12,15 +12,16 @@ interface NotificationRequest {
 const router = Router();
 
 let client: DynamoDBClient;
-let clientInitialized = false;
+let clientInitializationError: Error | null = null;
 
+// Initialize DynamoDB client
 try {
   client = new DynamoDBClient({
     region: process.env.AWS_REGION!,
-    credentials: fromInstanceMetadata(),
+    credentials: fromContainerMetadata(),
   });
-  clientInitialized = true;
 } catch (error) {
+  clientInitializationError = error as Error;
   console.error("Error initializing DynamoDB client:", error);
 }
 
@@ -28,8 +29,8 @@ router.post(
   "/notification",
   async (req: Request<{}, {}, NotificationRequest>, res: Response) => {
     try {
-      if (!clientInitialized) {
-        throw new Error("DynamoDB client initialization failed");
+      if (clientInitializationError) {
+        throw new Error(clientInitializationError.message);
       }
 
       if (!process.env.DYNAMODB_TABLE_NAME) {
@@ -86,8 +87,14 @@ router.post(
       }
     } catch (error) {
       console.error("Internal Server Error:", error);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
+      let errorMessage = "Internal Server Error";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      return res.status(500).json({
+        success: false,
+        errors: [{ key: "CreateError", error: errorMessage }],
+      });    }
   }
 );
 
