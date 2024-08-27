@@ -3,6 +3,9 @@ import os
 import requests
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 # Load environment variables from .env file into system environment
 load_dotenv()
@@ -58,13 +61,13 @@ def lambda_handler(event, context):
             if user_item:
                 # Check NotificationPreferences of user
                 notification_preferences = user_item.get('NotificationPreferences', {})
-                email_enabled = notification_preferences.get('email', False)
+                email_enabled = notification_preferences.get('Email', False)
                 
                 if email_enabled:
                     user_email = user_item.get('Email', None)
                     if user_email:
                         task_title = task['Task']
-                        send_email_notification(ses_client, task_title, user_email)
+                        send_email_notification(task_title, user_email)
 
                 # Create a notification entry in DynamoDB
                 notification_api_url = os.getenv('NOTIFICATION_MICROSERVICE_API_URL')
@@ -105,9 +108,9 @@ def get_user_details(dynamo_table, user_id):
     )
     return user_response.get('Item') if 'Item' in user_response else None
 
-def send_email_notification(ses_client, task_title, user_email):
+def send_email_notification(task_title, user_email):
     """
-    Send email notification using SES.
+    Send email notification using Gmail SMTP.
     """
     print(f"Sending email notification to {user_email} for task {task_title}")
     email_subject = "Reminder: Task Due Tomorrow"
@@ -119,19 +122,27 @@ def send_email_notification(ses_client, task_title, user_email):
     Best regards,
     Your Task Management System
     """
-    
+
+    # Load Gmail SMTP credentials from environment variables
+    gmail_user = os.getenv('GMAIL_USER')
+    gmail_password = os.getenv('GMAIL_PASSWORD')
+
+    # Set up the MIME
+    message = MIMEMultipart()
+    message['From'] = gmail_user
+    message['To'] = user_email
+    message['Subject'] = email_subject
+
+    # Attach the body with the msg instance
+    message.attach(MIMEText(email_body, 'plain'))
+
     try:
-        response = ses_client.send_email(
-            Source='abed.a01@hotmail.com',
-            Destination={
-                'ToAddresses': [user_email]
-            },
-            Message={
-                'Subject': {'Data': email_subject},
-                'Body': {'Text': {'Data': email_body}}
-            }
-        )
-        print("Email sent using SES: ", response)
+        # Connect to Gmail's SMTP server and send the email
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()  # Secure the connection
+            server.login(gmail_user, gmail_password)
+            server.send_message(message)
+            print(f"Email successfully sent to {user_email}")
     
     except Exception as e:
         print(f"Failed to send email: {e}")
