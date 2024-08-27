@@ -64,9 +64,8 @@ def lambda_handler(event, context):
                 logger.debug(f"User details for user ID '{user_id}': {user_details}")
 
                 # Send email notification if enabled
-                notification_preferences = user_details.get('NotificationPreferences', {})
-                user_email = notification_preferences.get('Email')
-                if user_email:
+                user_email = user_details.get('Email')
+                if user_details.get('NotificationPreferences', {}).get('Email') and user_email:
                     send_email_notification(task.get('Title'), user_email)
             
                 # Create a notification entry into the db
@@ -134,8 +133,6 @@ def send_email_notification(task_title, user_email):
 
         Just a quick reminder that your task '{task_title}' is due tomorrow.
         We wanted to make sure you're aware so you can plan ahead.
-
-        If you have any questions or need assistance, feel free to reach out.
 
         Best regards,
         Your Task Management Team
