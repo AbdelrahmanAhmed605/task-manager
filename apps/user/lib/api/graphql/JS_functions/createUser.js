@@ -11,7 +11,7 @@ export function request(ctx) {
     LastName: LastName || null,
     PhoneNumber: PhoneNumber || null,
     NotificationPreferences: {
-      Email: false,
+      Email: true,
       SMS: false,
     },
     CreatedAt: now,
