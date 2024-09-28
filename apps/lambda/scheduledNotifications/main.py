@@ -2,30 +2,35 @@ import boto3
 import os
 import requests
 from dotenv import load_dotenv
+import logging
+import textwrap
 from datetime import datetime, timedelta, timezone
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 # Load environment variables from .env file into system environment
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
+
 def lambda_handler(event, context):
-    # Initialize DynamoDB resource and SES client
+    """
+    Lambda function handler to process notifications for tasks due tomorrow.
+    """
     dynamodb = boto3.resource('dynamodb')
-    ses_client = boto3.client('ses')
     dynamo_table = dynamodb.Table('TaskManagement')
-
-    # Get the current UTC datetime as timezone-aware
+    
     now = datetime.now(timezone.utc)
-
-    # Calculate tomorrow's date
     tomorrow = now + timedelta(days=1)
-
-    # Format date as YYYY-MM-DD strings
     tomorrow_short = tomorrow.strftime('%Y-%m-%d')
     
-    print("tomorrow_short:", tomorrow_short)
+    logger.info(f"Processing tasks for: {tomorrow_short}")
 
     try:
-        # Query for tasks due the next day with NotificationSent = False, and Status not COMPLETED
+        # Query DynamoDB for tasks due tomorrow
         response = dynamo_table.query(
             IndexName='TaskDueNotificationIndex',
             KeyConditionExpression='#dueDateShort = :due_date_short',
@@ -41,47 +46,47 @@ def lambda_handler(event, context):
                 ':status_completed': 'COMPLETED'
             }
         )
-        
-        print("After Query Response:", response)
+        logger.debug(f"Query response: {response}")
 
-        # Process tasks and send notifications
         for task in response['Items']:
-            task_id = task['SK']
-            user_id = task['PK']
+            task_id = task.get('SK')
+            user_id = task.get('PK')
             
-            print(f"Processing task {task_id} for user {user_id}")
-            
-            # Query DynamoDB for user details
-            user_item = get_user_details(dynamo_table, user_id)
-            print(f"User details for {user_id}: {user_item}")
-            
-            if user_item:
-                # Check NotificationPreferences of user
-                notification_preferences = user_item.get('NotificationPreferences', {})
-                email_enabled = notification_preferences.get('email', False)
-                
-                if email_enabled:
-                    user_email = user_item.get('Email', None)
-                    if user_email:
-                        task_title = task['Task']
-                        send_email_notification(ses_client, task_title, user_email)
+            logger.info(f"Processing task with ID '{task_id}' for user with ID '{user_id}'")
 
-                # Create a notification entry in DynamoDB
+            try:
+                # Query for user details
+                user_details = get_user_details(dynamo_table, user_id)
+                if not user_details:
+                    logger.warning(f"No user details found for user ID '{user_id}'")
+                    continue
+
+                logger.debug(f"User details for user ID '{user_id}': {user_details}")
+
+                # Send email notification if enabled
+                user_email = user_details.get('Email')
+                if user_details.get('NotificationPreferences', {}).get('Email') and user_email:
+                    send_email_notification(task.get('Title'), user_email)
+            
+                # Create a notification entry into the db
                 notification_api_url = os.getenv('NOTIFICATION_MICROSERVICE_API_URL')
                 if not notification_api_url:
-                    raise ValueError('NOTIFICATION_MICROSERVICE_API_URL environment variable is not set.')
-                
+                    logger.error('Environment variable NOTIFICATION_MICROSERVICE_API_URL is not set.')
+                    continue
                 create_notification(notification_api_url, user_id, task_id)
 
+                # Update task's NotificationSent status
                 task_api_url = os.getenv('TASK_MICROSERVICE_API_URL')
                 if not task_api_url:
-                    raise ValueError('TASK_MICROSERVICE_API_URL environment variable is not set.')
-                
+                    logger.error('Environment variable TASK_MICROSERVICE_API_URL is not set.')
+                    continue
                 update_task_notification(task_api_url, task_id, user_id)
-    
+            
+            except Exception as inner_e:
+                logger.error(f"Error processing task with ID '{task_id}' for user with ID '{user_id}': {inner_e}", exc_info=True)
+
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        # Handle the error as per your application's requirements
+        logger.error(f"An unexpected error occurred while processing tasks: {e}", exc_info=True)
         return {
             'statusCode': 500,
             'body': 'Error processing notifications!'
@@ -96,113 +101,131 @@ def get_user_details(dynamo_table, user_id):
     """
     Query DynamoDB for user details.
     """
-    print(f"Querying for user details: {user_id}")
-    user_response = dynamo_table.get_item(
-        Key={
-            'PK': user_id,
-            'SK': user_id
-        }
-    )
-    return user_response.get('Item') if 'Item' in user_response else None
-
-def send_email_notification(ses_client, task_title, user_email):
-    """
-    Send email notification using SES.
-    """
-    print(f"Sending email notification to {user_email} for task {task_title}")
-    email_subject = "Reminder: Task Due Tomorrow"
-    email_body = f"""
-    Hello,
-
-    This is a friendly reminder that your task '{task_title}' is due tomorrow. Please take necessary actions.
-
-    Best regards,
-    Your Task Management System
-    """
-    
     try:
-        response = ses_client.send_email(
-            Source='abed.a01@hotmail.com',
-            Destination={
-                'ToAddresses': [user_email]
-            },
-            Message={
-                'Subject': {'Data': email_subject},
-                'Body': {'Text': {'Data': email_body}}
+        logger.debug(f"Querying for user details with user ID '{user_id}'")
+        user_response = dynamo_table.get_item(
+            Key={
+                'PK': user_id,
+                'SK': user_id
             }
         )
-        print("Email sent using SES: ", response)
-    
+        return user_response.get('Item')
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        logger.error(f"Error querying user details with user ID '{user_id}': {e}", exc_info=True)
+        return None
+
+def send_email_notification(task_title, user_email):
+    """
+    Send email notification using Gmail SMTP.
+    """
+    gmail_user = os.getenv('GMAIL_USER')
+    gmail_password = os.getenv('GMAIL_PASSWORD')
+
+    if not gmail_user or not gmail_password:
+        logger.error('Environment variable GMAIL_USER or GMAIL_PASSWORD is not set.')
+        return
+
+    try:
+        logger.info(f"Sending email notification to '{user_email}' for task '{task_title}'")
+        email_subject = "Friendly Reminder: Task Due Tomorrow"
+        email_body = textwrap.dedent(f"""
+        Hi there,
+
+        Just a quick reminder that your task '{task_title}' is due tomorrow.
+        We wanted to make sure you're aware so you can plan ahead.
+
+        Best regards,
+        Your Task Management Team
+        """)
+
+        message = MIMEMultipart()
+        message['From'] = gmail_user
+        message['To'] = user_email
+        message['Subject'] = email_subject
+        message.attach(MIMEText(email_body, 'plain'))
+
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()  # Secure the connection
+            server.login(gmail_user, gmail_password)
+            server.send_message(message)
+            logger.info(f"Email successfully sent to '{user_email}'")
+    except smtplib.SMTPException as e:
+        logger.error(f"SMTP error occurred while sending email to '{user_email}': {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"Failed to send email to '{user_email}': {e}", exc_info=True)
 
 def create_notification(notification_api_url, user_id, task_id):
     """
     Create a notification entry in the notification microservice.
     """
-    print(f"Creating notification for user {user_id} and task {task_id}")
-    payload = {
-        'userId': user_id,
-        'taskId': task_id,
-    }
-    
+    if not notification_api_url:
+        logger.error('Environment variable NOTIFICATION_MICROSERVICE_API_URL is not set.')
+        return
+
     try:
+        logger.info(f"Creating notification for user ID '{user_id}' and task ID '{task_id}'")
+        payload = {
+            'userId': user_id,
+            'taskId': task_id,
+        }
         response = requests.post(notification_api_url, json=payload)
-        response.raise_for_status()  # This will raise an HTTPError for bad responses (4xx and 5xx)
+        response.raise_for_status()
+        logger.info("Notification created successfully.")
     except requests.exceptions.HTTPError as err:
+        logger.error(f"HTTP error occurred while creating notification for user ID '{user_id}' and task ID '{task_id}': {err}", exc_info=True)
         try:
-            # Try to extract the JSON response
             error_response = response.json()
-            # Extract and print the error messages
             for error in error_response.get('errors', []):
-                print(f"Error key: {error.get('key')}, Error message: {error.get('error')}")
+                logger.error(f"Notification API error key: {error.get('key')}, message: {error.get('error')}")
         except ValueError:
-            # If the response is not JSON, print the raw text
-            print(f"Failed to create notification: HTTP error occurred - {err}")
-            print(f"Response content: {response.text}")
+            logger.error(f"Notification API response content: {response.text}")
     except requests.exceptions.RequestException as err:
-        print(f"Failed to create notification: Request failed - {err}")
+        logger.error(f"Request error occurred while creating notification for user ID '{user_id}' and task ID '{task_id}': {err}", exc_info=True)
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        logger.error(f"Unexpected error occurred while creating notification for user ID '{user_id}' and task ID '{task_id}': {e}", exc_info=True)
 
 def update_task_notification(task_api_url, task_id, user_id):
     """
     Update NotificationSent field in task microservice using GraphQL mutation.
     """
-    print(f"Updating task {task_id} to set NotificationSent to true")
-    mutation = """
-    mutation UpdateTaskNotification($userId: String!, $taskId: String!) {
-      updateTask(input: { UserId: $userId, TaskId: $taskId, NotificationSent: true }) {
-        success
-        errors {
-          key
-          error
-        }
-      }
-    }
-    """
-    
-    graphql_payload = {
-        'query': mutation,
-        'variables': {
-            'userId': user_id,
-            'taskId': task_id
-        }
-    }
-    
-    headers = {
-        'Content-Type': 'application/json',
-        'x-lambda-header': os.getenv('LAMBDA_TASKSERVICE_API_KEY')
-    }
-    
+    if not task_api_url:
+        logger.error('Environment variable TASK_MICROSERVICE_API_URL is not set.')
+        return
+
     try:
+        logger.info(f"Updating task with ID '{task_id}' to set NotificationSent to true")
+        mutation = """
+        mutation UpdateTaskNotification($userId: String!, $taskId: String!) {
+          updateTask(input: { UserId: $userId, TaskId: $taskId, NotificationSent: true }) {
+            success
+            errors {
+              key
+              error
+            }
+          }
+        }
+        """
+        graphql_payload = {
+            'query': mutation,
+            'variables': {
+                'userId': user_id,
+                'taskId': task_id
+            }
+        }
+        headers = {
+            'Content-Type': 'application/json',
+            'x-lambda-header': os.getenv('LAMBDA_TASKSERVICE_API_KEY')
+        }
+        if not headers['x-lambda-header']:
+            logger.error('Environment variable LAMBDA_TASKSERVICE_API_KEY is not set.')
+            return
+
         response = requests.post(task_api_url, json=graphql_payload, headers=headers)
         response.raise_for_status()
-        print("Task update API call successful!")
-    
+        logger.info("Task update API call successful!")
     except requests.exceptions.HTTPError as err:
-        print(f"Failed to update task notification: HTTP error occurred - {err}")
+        logger.error(f"HTTP error occurred while updating task with ID '{task_id}': {err}", exc_info=True)
     except requests.exceptions.RequestException as err:
-        print(f"Failed to update task notification: Request failed - {err}")
+        logger.error(f"Request error occurred while updating task with ID '{task_id}': {err}", exc_info=True)
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        logger.error(f"Unexpected error occurred while updating task with ID '{task_id}': {e}", exc_info=True)
