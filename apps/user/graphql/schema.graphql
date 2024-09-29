@@ -1,55 +1,35 @@
 type User {
   PK: String!
   SK: String!
-  Email: String!
+  Email: AWSEmail!
   FirstName: String
   LastName: String
-  PhoneNumber: String
-  NotificationPreferences: NotificationPreferences
   CreatedAt: AWSDateTime
   UpdatedAt: AWSDateTime
   LastLogin: AWSDateTime
 }
 
-type NotificationPreferences {
-  Email: Boolean
-  SMS: Boolean
-}
-
 type GraphQLError {
   message: String!
-  locations: [ErrorLocation]
-  path: [String]
+  type: String!
   extensions: AWSJSON
-}
-
-type ErrorLocation {
-  line: Int
-  column: Int
 }
 
 type Response {
   success: Boolean!
   errors: [GraphQLError]
+  user: User
 }
 
 input CreateUserInput {
-  Email: String!
+  Email: AWSEmail!
   FirstName: String
   LastName: String
-  PhoneNumber: String
-}
-
-input NotificationPreferencesInput {
-  Email: Boolean
-  SMS: Boolean
 }
 
 input UpdateUserInput {
   FirstName: String
   LastName: String
-  PhoneNumber: String
-  NotificationPreferences: NotificationPreferencesInput
 }
 
 type Query {

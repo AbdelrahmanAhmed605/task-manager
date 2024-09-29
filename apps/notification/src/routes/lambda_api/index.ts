@@ -51,8 +51,8 @@ router.post(
         PK: `${userId}`,
         SK: `NOTIFICATION#${uuidv4()}`,
         Notif_Task: `${taskId}`,
-        Notif_Timestamp: new Date().toISOString(),
-        NotificationTTL: ttlTimestamp,
+        NotificationTimestamp: new Date().toISOString(),
+        NotificationExpiry: ttlTimestamp,
         CreatedAt: new Date().toISOString(),
         UpdatedAt: new Date().toISOString(),
       };
@@ -94,7 +94,8 @@ router.post(
       return res.status(500).json({
         success: false,
         errors: [{ key: "CreateError", error: errorMessage }],
-      });    }
+      });
+    }
   }
 );
 
