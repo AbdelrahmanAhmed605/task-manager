@@ -11,13 +11,24 @@ import { fromEnv } from "@aws-sdk/credential-providers";
 import { v4 as uuidv4 } from "uuid";
 import {
   CreateTaskInput,
+  CreateProjectInput,
   UpdateTaskInput,
-  MutationResponse,
-  Status,
+  TaskMutationResponse,
+  ProjectMutationResponse,
+  TaskStatus,
   Task,
+  Project,
+  TaskPriority,
   DeleteTaskInput,
+  UpdateProjectInput,
 } from "./TypeDefs";
 import { ContextType } from "./types";
+import {
+  CreateTaskInputSchema,
+  UpdateTaskInputSchema,
+  CreateProjectInputSchema,
+  UpdateProjectInputSchema,
+} from "./zodSchema";
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
@@ -29,114 +40,156 @@ export const Mutation = {
     _: any,
     { input }: { input: CreateTaskInput },
     context: ContextType
-  ): Promise<MutationResponse> => {
+  ): Promise<TaskMutationResponse> => {
     if (!process.env.DYNAMODB_TABLE_NAME) {
       throw new Error("Could not connect to database");
     }
 
-    const userId = context?.user.username;
+    const userId = context?.user.sub;
+    input.DueDate = input.DueDate
+      ? new Date(input.DueDate).toISOString().split("T")[0]
+      : new Date(Date.now()).toISOString().split("T")[0];
 
-    // Prepare the item to be put into DynamoDB
+    // Validation Checks
+    const validation = CreateTaskInputSchema.safeParse(input);
+    if (!validation.success) {
+      return {
+        success: false,
+        errors: validation.error.errors.map((err) => ({
+          key: err.path.join("."),
+          error: err.message,
+        })),
+      };
+    }
+
+    const taskId = uuidv4();
+    const isProjectTask = !!input.ProjectID;
+
     const item = {
       PK: `USER#${userId}`,
-      SK: `TASK#${uuidv4()}`,
+      SK: `TASK#${taskId}`,
+      UserTaskKey: `USER#${userId}TASK#${taskId}`,
       Title: input.Title,
-      Description: input.Description,
-      Status: Status.TODO,
+      Description: input.Description || null,
+      Status: TaskStatus.TODO,
+      Priority: input.Priority || TaskPriority.LOW,
+      ProjectID: input.ProjectID || null,
+      ProjectAssociation: isProjectTask,
+      Labels: input.Labels || [],
       NotificationSent: false,
-      DueDate: input.DueDate.toISOString(),
-      DueDateShort: input.DueDate.toISOString().split("T")[0], // Only contains the date (YYYY-MM-DD) without the time, since querying in DynamoDB indexes can only use equal-to operation
+      Reminder: input.Reminder || false,
+      ReminderTime: input.ReminderTime || null,
+      DueDate: input.DueDate,
+      TaskCompletedAt: null,
       CreatedAt: new Date().toISOString(),
-      TaskUpdatedAt: new Date().toISOString(),
+      UpdatedAt: new Date().toISOString(),
     };
 
     const params = {
       TableName: process.env.DYNAMODB_TABLE_NAME,
-      Item: marshall(item), // Convert item to DynamoDB AttributeValues
+      Item: marshall(
+        Object.fromEntries(
+          Object.entries(item).filter(([_, v]) => v !== undefined)
+        )
+      ),
     };
 
     const command = new PutItemCommand(params);
+    const response = await client.send(command);
 
-    try {
-      const response = await client.send(command);
-
-      const createdTask = {
-        ...item,
-        TaskCompletedAt: null,
-      };
-      return {
-        success: true,
-        Task: createdTask,
-        errors: [],
-      };
-    } catch (error) {
-      console.error("Error creating task:", error);
-      let errorMessage = "An unknown error occurred";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
+    if (!response) {
       return {
         success: false,
-        errors: [{ key: "CreateError", error: errorMessage }],
+        errors: [
+          {
+            key: "CreateError",
+            error: "Failed to create task.",
+          },
+        ],
       };
     }
+
+    const createdTask = {
+      ...item,
+      TaskCompletedAt: null,
+    };
+
+    return {
+      success: true,
+      task: createdTask,
+      errors: [],
+    };
   },
   updateTask: async (
     _: any,
     { input }: { input: UpdateTaskInput },
     context: ContextType
-  ): Promise<MutationResponse> => {
+  ): Promise<TaskMutationResponse> => {
     if (!process.env.DYNAMODB_TABLE_NAME) {
       throw new Error("Could not connect to database");
     }
 
-    const userId = context?.user?.username
-      ? `USER#${context.user.username}`
-      : input.UserId;
-
-    if (!userId || !input.TaskId) {
+    const userId = context?.user?.sub ? `USER#${context.user.sub}` : input.PK;
+    if (!userId || !input.SK) {
       throw new Error("Invalid input: userId and taskId are required.");
     }
 
-    const itemKey = {
-      PK: userId,
-      SK: `${input.TaskId}`,
-    };
+    const itemKey = { PK: userId, SK: input.SK };
 
-    // Prepare the update expression and attribute values
+    // Validation Checks using Zod schema
+    const validation = UpdateTaskInputSchema.safeParse(input);
+    if (!validation.success) {
+      return {
+        success: false,
+        errors: validation.error.errors.map((err) => ({
+          key: err.path.join("."),
+          error: err.message,
+        })),
+      };
+    }
+
+    // Initialize update expression and attribute values
     let updateExpression = "SET TaskUpdatedAt = :taskUpdatedAt";
     const expressionAttributeValues: Record<string, any> = {
       ":taskUpdatedAt": new Date().toISOString(),
     };
     const expressionAttributeNames: Record<string, string> = {};
 
-    if (input.Title !== undefined) {
-      updateExpression += ", Title = :title";
-      expressionAttributeValues[":title"] = input.Title;
-    }
-    if (input.Description !== undefined) {
-      updateExpression += ", Description = :description";
-      expressionAttributeValues[":description"] = input.Description;
-    }
-    if (input.NotificationSent !== undefined) {
-      updateExpression += ", NotificationSent = :notificationsent";
-      expressionAttributeValues[":notificationsent"] = input.NotificationSent;
-    }
-    if (input.Status !== undefined) {
-      updateExpression += ", #status = :status";
-      expressionAttributeValues[":status"] = input.Status;
-      expressionAttributeNames["#status"] = "Status";
-      if (input.Status === Status.COMPLETED) {
-        updateExpression += ", TaskCompletedAt = :taskCompletedAt";
-        expressionAttributeValues[":taskCompletedAt"] =
-          new Date().toISOString();
+    // Field mappings for update expression (excluding PK and SK)
+    const fieldMappings: Partial<Record<keyof UpdateTaskInput, string>> = {
+      Title: "Title",
+      Description: "Description",
+      NotificationSent: "NotificationSent",
+      Status: "Status",
+      DueDate: "DueDate",
+      Reminder: "Reminder",
+      ReminderTime: "ReminderTime",
+      Labels: "Labels",
+      Priority: "Priority",
+      ProjectID: "ProjectID",
+    };
+
+    // Construct update expression from input
+    for (const key of Object.keys(input) as Array<keyof UpdateTaskInput>) {
+      const value = input[key];
+      if (value !== undefined && fieldMappings[key]) {
+        const attributeName = fieldMappings[key];
+        if (key === "Status") {
+          updateExpression += `, #${attributeName} = :${attributeName}`;
+          expressionAttributeNames[`#${attributeName}`] =
+            attributeName as string;
+        } else {
+          updateExpression += `, ${attributeName} = :${attributeName}`;
+        }
+
+        expressionAttributeValues[`:${attributeName}`] = value;
       }
     }
-    if (input.DueDate !== undefined) {
-      updateExpression += ", DueDate = :dueDate, DueDateShort = :dueDateShort";
-      expressionAttributeValues[":dueDate"] = input.DueDate.toISOString();
-      expressionAttributeValues[":dueDateShort"] =
-        input.DueDate.toISOString().split("T")[0];
+
+    if (input.ProjectID !== undefined) {
+      const isProjectTask = !!input.ProjectID;
+      updateExpression += `, ProjectAssociation = :projectAssociation`;
+      expressionAttributeValues[":projectAssociation"] = isProjectTask;
     }
 
     const params: UpdateItemCommandInput = {
@@ -146,59 +199,42 @@ export const Mutation = {
       ExpressionAttributeValues: marshall(expressionAttributeValues),
       ReturnValues: ReturnValue.ALL_NEW,
     };
+
     if (Object.keys(expressionAttributeNames).length > 0) {
       params.ExpressionAttributeNames = expressionAttributeNames;
     }
 
-    const command = new UpdateItemCommand(params);
-
-    try {
-      const response = await client.send(command);
-
-      if (response.Attributes) {
-        const updatedTask = unmarshall(response.Attributes) as Task;
-        return {
-          success: true,
-          Task: updatedTask,
-          errors: [],
-        };
-      } else {
-        return {
-          success: false,
-          errors: [
-            {
-              key: "UpdateError",
-              error: "No attributes returned from update operation",
-            },
-          ],
-        };
-      }
-    } catch (error) {
-      console.error("Error updating task:", error);
-      let errorMessage = "An unknown error occurred";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
+    const response = await client.send(new UpdateItemCommand(params));
+    if (!response.Attributes) {
       return {
         success: false,
-        errors: [{ key: "UpdateError", error: errorMessage }],
+        errors: [
+          {
+            key: "UpdateError",
+            error: "No attributes returned from update operation",
+          },
+        ],
       };
     }
+
+    const updatedTask = unmarshall(response.Attributes) as Task;
+    return { success: true, task: updatedTask, errors: [] };
   },
   deleteTask: async (
     _: any,
-    { taskId }: DeleteTaskInput,
+    { PK, SK }: DeleteTaskInput,
     context: ContextType
-  ): Promise<MutationResponse> => {
+  ): Promise<TaskMutationResponse> => {
     if (!process.env.DYNAMODB_TABLE_NAME) {
       throw new Error("Could not connect to database");
     }
 
-    const userId = context?.user.username;
+    const userId = context?.user.sub;
+    const finalPK = PK || `USER#${userId}`;
 
     const itemKey = {
-      PK: `USER#${userId}`,
-      SK: `${taskId}`,
+      PK: finalPK,
+      SK: SK,
     };
 
     const params = {
@@ -207,25 +243,143 @@ export const Mutation = {
     };
 
     const command = new DeleteItemCommand(params);
+    const response = await client.send(command);
 
-    try {
-      await client.send(command);
-
-      return {
-        success: true,
-        Task: null,
-        errors: [],
-      };
-    } catch (error) {
-      console.error("Error deleting task:", error);
-      let errorMessage = "An unknown error occurred";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
+    if (!response) {
       return {
         success: false,
-        errors: [{ key: "DeleteError", error: errorMessage }],
+        errors: [
+          {
+            key: "DeleteError",
+            error: "Failed to delete task.",
+          },
+        ],
       };
     }
+
+    return {
+      success: true,
+      task: null,
+      errors: [],
+    };
+  },
+  createProject: async (
+    _: any,
+    { input }: { input: CreateProjectInput },
+    context: ContextType
+  ): Promise<ProjectMutationResponse> => {
+    if (!process.env.DYNAMODB_TABLE_NAME) {
+      throw new Error("Could not connect to database");
+    }
+
+    const userId = context?.user.sub;
+
+    // Validation Checks
+    const validation = CreateProjectInputSchema.safeParse(input);
+    if (!validation.success) {
+      return {
+        success: false,
+        errors: validation.error.errors.map((err) => ({
+          key: err.path.join("."),
+          error: err.message,
+        })),
+      };
+    }
+
+    const projectId = uuidv4();
+    const item = {
+      PK: `USER#${userId}`,
+      SK: `PROJECT#${projectId}`,
+      Title: input.Title,
+      CreatedAt: new Date().toISOString(),
+      UpdatedAt: new Date().toISOString(),
+    };
+
+    const params = {
+      TableName: process.env.DYNAMODB_TABLE_NAME,
+      Item: marshall(item),
+    };
+
+    const command = new PutItemCommand(params);
+    const response = await client.send(command);
+
+    if (!response) {
+      return {
+        success: false,
+        errors: [
+          {
+            key: "CreateError",
+            error: "Failed to create project.",
+          },
+        ],
+      };
+    }
+
+    return {
+      success: true,
+      errors: [],
+      project: item,
+    };
+  },
+  updateProject: async (
+    _: any,
+    { input }: { input: UpdateProjectInput },
+    context: ContextType
+  ): Promise<ProjectMutationResponse> => {
+    if (!process.env.DYNAMODB_TABLE_NAME) {
+      throw new Error("Could not connect to database");
+    }
+
+    const userId = context?.user?.sub ? `USER#${context.user.sub}` : input.PK;
+    if (!userId || !input.SK) {
+      throw new Error("Invalid input: userId and projectId are required.");
+    }
+
+    const itemKey = { PK: userId, SK: input.SK };
+
+    // Validation Checks
+    const validation = UpdateProjectInputSchema.safeParse(input);
+    if (!validation.success) {
+      return {
+        success: false,
+        errors: validation.error.errors.map((err) => ({
+          key: err.path.join("."),
+          error: err.message,
+        })),
+      };
+    }
+
+    const params = {
+      TableName: process.env.DYNAMODB_TABLE_NAME,
+      Key: marshall(itemKey),
+      UpdateExpression: "SET Title = :title, UpdatedAt = :updatedAt",
+      ExpressionAttributeValues: marshall({
+        ":title": input.Title,
+        ":updatedAt": new Date().toISOString(),
+      }),
+      ReturnValues: ReturnValue.ALL_NEW,
+    };
+
+    const response = await client.send(new UpdateItemCommand(params));
+    if (!response.Attributes) {
+      return {
+        success: false,
+        errors: [
+          {
+            key: "UpdateError",
+            error: "No attributes returned from update operation",
+          },
+        ],
+      };
+    }
+
+    const updatedProject = unmarshall(response.Attributes) as Project;
+
+    // Return the successful response
+    return {
+      success: true,
+      project: updatedProject,
+      errors: [],
+    };
   },
 };
