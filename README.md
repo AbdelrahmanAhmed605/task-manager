@@ -3,6 +3,7 @@
 This project is a Task Management Application where users can experience the intricacies of creating, managing, and tracking tasks within a cloud-based environment. The project was designed to learn and explore the deployment of a microservices architecture using an AWS infrastructure.
 
 ## Table of Contents
+
 - [Overview](#overview)
 - [Architecture Diagram](#architecture-diagram)
 - [DynamoDB Schema Overview](#dynamodb-schema-overview)
@@ -16,11 +17,13 @@ This project is a Task Management Application where users can experience the int
 The Task Management Application provides the following features:
 
 ### User Management
+
 - Users can register for an account.
 - Users can log in and log out.
 - Users can update their profile information.
 
 ### Task Management
+
 - Users can create new tasks.
 - Users can view a list of their tasks.
 - Users can update existing tasks.
@@ -28,10 +31,12 @@ The Task Management Application provides the following features:
 - Tasks can have titles, descriptions, due dates, and statuses (e.g., pending, in progress, completed).
 
 ### Notification System
+
 - Users receive notifications for upcoming task deadlines.
 - Users receive notifications when tasks are completed.
 
 ### User Interface
+
 - Responsive web interface using Next.js.
 - Intuitive design for managing tasks.
 - Visual indicators for task status and due dates.
@@ -39,7 +44,6 @@ The Task Management Application provides the following features:
 ## Architecture Diagram
 
 ![AWS (2019) horizontal framework - Page 1](https://github.com/AbdelrahmanAhmed605/task-manager/assets/98119874/6778218c-7755-4400-b411-0d05c4073d01)
-
 
 ## DynamoDB Schema Overview
 
@@ -63,7 +67,7 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
   - Values: `USER_<UserID>`, `TASK_<TaskID>`, `NOTIF_<NotificationID>`
   - For `USER_`, attributes include Email, Password, FirstName, LastName, PhoneNumber, NotificationPreferences, CreatedAt, UpdatedAt, LastLogin.
   - For `TASK_`, attributes include Title, Description, Status, NotificationSent, DueDate, CreatedAt, TaskUpdatedAt, TaskCompletedAt.
-  - For `NOTIF_`, attributes include Notif_Timestamp, Notif_isRead, NotificationTTL
+  - For `NOTIF_`, attributes include NotificationTimestamp, Notif_isRead, NotificationExpiry
 - **Email:** String - User's email address.
 - **Password:** String - User's password (hashed for security).
 - **FirstName:** String - User's first name.
@@ -80,28 +84,28 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
 - **TaskUpdatedAt:** DateTime - Timestamp of the task's last update.
 - **TaskCompletedAt:** DateTime - Timestamp of when the task was completed.
 - **Notif_isRead:** Boolean - Indicates whether a notification has been read.
-- **Notif_Timestamp:** DateTime - Timestamp of notification creation.
-- **NotificationTTL:** Number - Time-to-live (TTL) attribute for notifications to automatically delete old notifications from the table to keep dataset manageable and reduce storage costs
+- **NotificationTimestamp:** DateTime - Timestamp of notification creation.
+- **NotificationExpiry:** Number - Time-to-live (TTL) attribute for notifications to automatically delete old notifications from the table to keep dataset manageable and reduce storage costs
 - **CreatedAt:** DateTime - Timestamp of entity creation.
 - **UpdatedAt:** DateTime - Timestamp of entity update.
 
 ### 4. Global Secondary Indexes (GSIs) and Local Secondary Indexes (LSIs)
 
 - **GSIs:**
+
   - **EmailIndex:** `PK: Email` - Used when we want to ensure email uniqueness when a user is signing up, and also for facilitating login queries (to find the user with the submitted email and their corresponding password)
   - **NotificationSentIndex:** `PK: DueDate_NotificationSent` - Query tasks where `NotificationSent` is false and are due the next day to send out notification alerts.
 
 - **LSIs:**
   - **UpdatedAtIndex:** `PK: EntityPartition (USER_<UserID>)`, `SK: TaskUpdatedAt` - Query tasks for a user sorted by the most recently updated tasks.
-  - **NotificationTimestampIndex:** `PK: EntityPartition (USER_<UserID>)`, `SK: Notif_Timestamp` - Query notifications for a user sorted by when they were received.
+  - **NotificationTimestampIndex:** `PK: EntityPartition (USER_<UserID>)`, `SK: NotificationTimestamp` - Query notifications for a user sorted by when they were received.
 
 ### 5. Considerations for Schema Design
 
 - **EntityPartition and EntitySort:** These keys allow for the storage of various types of data (users, tasks, notifications) within the same table, facilitating efficient querying and management.
 - **DueDate_NotificationSent:** A composite key combining due date and notification status for the `NotificationSentIndex`, enabling even data distribution and efficient querying of tasks for daily notifications. If NotificationSent was selected as the partition key instead, then we would only have 2 partitions (true and false), which is not a good distribution.`
-- **TaskUpdatedAt and Notif_Timestamp:** These attributes serve as sort keys for the LSIs, `UpdatedAtIndex` and `NotificationTimestampIndex`, respectively. By utilizing these dedicated sort keys for tasks and notifications, we ensure that only relevant data is retrieved when querying for the most recently updated tasks or notifications. This approach eliminates the need for additional filtering and enhances query efficiency.
-    - If instead of TaskUpdatedAt, we used UpdatedAt (which is also used for users), then the composite primary key for the LSI would return both user and task data and we would need to filter out the results. By using TaskUpdatedAt which is only applied to tasks, the composite primary key will only return task data
-
+- **TaskUpdatedAt and NotificationTimestamp:** These attributes serve as sort keys for the LSIs, `UpdatedAtIndex` and `NotificationTimestampIndex`, respectively. By utilizing these dedicated sort keys for tasks and notifications, we ensure that only relevant data is retrieved when querying for the most recently updated tasks or notifications. This approach eliminates the need for additional filtering and enhances query efficiency.
+  - If instead of TaskUpdatedAt, we used UpdatedAt (which is also used for users), then the composite primary key for the LSI would return both user and task data and we would need to filter out the results. By using TaskUpdatedAt which is only applied to tasks, the composite primary key will only return task data
 
 ### 6. Limitations
 
@@ -115,7 +119,6 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
 ### High-Level Overview
 
 ![AWS (2019) horizontal framework](https://github.com/AbdelrahmanAhmed605/task-manager/assets/98119874/6eef05a6-9d73-47ae-b33f-e497a8a8dbd2)
-
 
 ### 1. User Registration and Authentication:
 
@@ -146,6 +149,7 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
 - If the authentication tokens are valid, the backend processes the profile update request and updates the corresponding records in the Users table in DynamoDB.
 
 ### 3. Task Management
+
 - **Task Creation:**
   - Users create new tasks through the application interface, providing details such as the task title, description, due date, and status.
   - The application backend processes the task creation request and inserts a new record into the Tasks table in DynamoDB, associating the task with the respective user (identified by `USER_<UserID>`).
@@ -154,23 +158,29 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
   - Task status updates and completion actions are reflected in the `Status` and `TaskCompletedAt` attributes of the corresponding task records.
 
 ### 4. Notification Subscription and Delivery
+
 - **User Notification Preferences:**
+
   - Users manage their notification preferences (email/SMS) through the application interface.
   - Preferences are stored in the `NotificationPreferences` field in the Users table.
 
 - **Scheduled Batch Processing:**
+
   - A scheduled Lambda function, triggered by a CloudWatch Event (could be run once or twice a day), periodically checks for tasks due within the next 24 hours.
   - The Lambda function queries the Tasks table for tasks due the next day and have `NotificationSent` set to false. The `DueDate_NotificationSent` composite attribute is used for efficient querying.
 
 - **Notification Delivery:**
+
   - When the Lambda function finds tasks due within the next day with `NotificationSent` set to false, it sends the notifications and updates the `NotificationSent` flag to true.
   - Before publishing the notifications, the Lambda function checks the `NotificationPreferences` of the corresponding user in the Users table to determine whether to send email or SMS notifications, or just show an in-app notification (default).
 
 - **In-App Notifications:**
+
   - For in-app notifications (default), the Lambda function logs the notification in the Notifications table.
   - When a user logs back into the app, new notifications appear in the notifications tab. Initially, this will involve periodic polling of the DynamoDB database for new notifications for the user. Implementing WebSockets later can provide real-time notifications.
 
 - **SNS Topics and Lambda Functions:**
+
   - If a user has opted in for email/SMS notifications, the Lambda function publishes the notification to the appropriate SNS topic.
   - There will be 4 SNS topics: `TaskDueNotificationsEmailTopic`, `TaskDueNotificationsSMSTopic`, `TaskCompletedNotificationsEmailTopic`, `TaskCompletedNotificationsSMSTopic`.
 
@@ -178,17 +188,17 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
   - If a user updates a task's due date, the task will be picked up by the periodic Lambda function when it's within the new notification timeframe.
 
 ### 5. Viewing Notification History
+
 - **Accessing Notification History:**
   - Users can access their notification history through the application interface.
-  - The application backend queries the Notifications table for the logged-in user's notifications using the `USER_<UserID>` partition key and the `Notif_Timestamp` sort key.
+  - The application backend queries the Notifications table for the logged-in user's notifications using the `USER_<UserID>` partition key and the `NotificationTimestamp` sort key.
   - The backend returns the list of notifications, which is then displayed in the user's interface.
-- **NotificationTTL:**
-  - Notifications are automatically deleted after a specified period using the `NotificationTTL` attribute, which acts as a time-to-live (TTL) mechanism.
+- **NotificationExpiry:**
+  - Notifications are automatically deleted after a specified period using the `NotificationExpiry` attribute, which acts as a time-to-live (TTL) mechanism.
   - **Benefits of TTL:**
     - Automatically removing old notifications helps manage the size of the Notifications table, ensuring it doesn't grow excessively large over time.
     - This improves the performance of queries by keeping the dataset manageable.
     - It also reduces storage costs by eliminating unnecessary old data.
-
 
 ## AWS Services
 
@@ -235,60 +245,70 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
 - **Internet Gateway:** Allows internet access for resources within the VPC.
 - **NAT Gateway:** Allows outbound internet access for resources in private subnets.
 
-
 ## Project Plan
 
 ### Phase 1: Planning Setup
 
 #### Project Planning
+
 - Define the scope and requirements of the application.
 - Design the architecture diagram, showing how different services will interact.
 
 ### Phase 2: Infrastructure Setup
 
 #### Networking
+
 - VPC: Create a Virtual Private Cloud (VPC) with appropriate subnets (public/private), route tables, and security groups.
 - Route 53: Set up domain name management for your application.
 - Internet Gateway: Allow internet access for resources within the VPC.
 - NAT Gateway: Set up NAT Gateway to allow outbound internet access for resources in private subnets.
 
 #### Database
+
 - Amazon DynamoDB: Set up a DynamoDB database for storing user and task data. Configure initial database schema.
 
 #### Secrets Management
+
 - Secrets Manager: Store database credentials, API keys, and other secrets securely.
 
 ### Phase 3: Backend Development
 
 #### Microservices Development
+
 - User Service: Implement user authentication and profile management.
 - Task Service: Implement task creation, updating, and deletion functionalities.
 - Notification Service: Implement notifications for due or completed tasks.
 
 #### Containerization
+
 - Containerize each microservice using Docker.
 
 #### ECS Setup
+
 - ECS: Set up Elastic Container Service to run backend services.
 - Fargate: Use Fargate for serverless container management.
 - ALB: Configure Application Load Balancer to distribute traffic among ECS services.
 
 #### API Gateway
+
 - Set up API Gateway to route requests to the appropriate microservice.
 
 ### Phase 4: Frontend Development
 
 #### Frontend Implementation
+
 - Develop the frontend using Next.js (React) for the task management application.
 - Ensure the frontend communicates correctly with the backend services.
 
 #### Static File Hosting
+
 - AWS Amplify: Host static files of the Next.js frontend using AWS Amplify.
 - CloudFront: Set up CloudFront CDN to ensure fast delivery of the frontend globally.
 
 ### Phase 5: Continuous Integration and Continuous Deployment (CI/CD)
 
 #### CI/CD Pipeline Setup
+
 - **AWS CodePipeline:** Create a pipeline to manage the CI/CD workflow.
 - **AWS CodeBuild:** Configure builds and tests.
 - **AWS CodeDeploy:** Automate deployments.
@@ -297,27 +317,31 @@ This DynamoDB schema is designed to efficiently store and retrieve user data, ta
 ### Phase 6: Authentication
 
 #### User Authentication
+
 - **Amazon Cognito:** Set up Cognito for user authentication, registration, and profile management.
 
 ### Phase 7: Monitoring and Logging
 
 #### Monitoring and Logging
+
 - **CloudWatch:** Set up CloudWatch for monitoring applications and AWS resources, collecting and tracking metrics, and logging.
 
 ### Phase 8: Testing and Deployment
 
 #### End-to-End Testing
+
 - Perform comprehensive testing, including unit tests and integration tests
 - Ensure all services are working together as expected.
 
 #### Deployment
+
 - Deploy the application to the production environment using the CI/CD pipeline.
 
 #### Post-Deployment Monitoring
+
 - Continuously monitor the application using CloudWatch.
 - Set up alerts for critical metrics and issues.
 
 ## License
 
 This project is licensed under the MIT License.
-
