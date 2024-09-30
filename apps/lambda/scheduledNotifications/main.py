@@ -13,8 +13,8 @@ from email.mime.text import MIMEText
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     """
@@ -23,30 +23,33 @@ def lambda_handler(event, context):
     dynamodb = boto3.resource('dynamodb')
     dynamo_table = dynamodb.Table('TaskManagement')
     
-    now = datetime.now(timezone.utc)
-    tomorrow = now + timedelta(days=1)
-    tomorrow_short = tomorrow.strftime('%Y-%m-%d')
+    # Get current date and set minutes and seconds to 0 for start of hour
+    current_time = datetime.now(timezone.utc)
+    start_of_hour = current_time.replace(minute=0, second=0, microsecond=0)
+
+    # Convert to ISO 8601 format (AWSDateTime)
+    start_of_hour_iso = start_of_hour.strftime('%Y-%m-%dT%H:%M:%S.000Z') 
     
-    logger.info(f"Processing tasks for: {tomorrow_short}")
+    logger.info(f"Processing tasks for {start_of_hour_iso}")
 
     try:
-        # Query DynamoDB for tasks due tomorrow
+       # Query DynamoDB for tasks that have ReminderTime equal to the start of the hour
         response = dynamo_table.query(
-            IndexName='TaskDueNotificationIndex',
-            KeyConditionExpression='#dueDateShort = :due_date_short',
+            IndexName='TaskReminderIndex',
+            KeyConditionExpression='#reminderTime = :start_of_hour',
             FilterExpression='#notificationSent = :sent and #status <> :status_completed',
             ExpressionAttributeNames={
-                '#dueDateShort': 'DueDateShort',
+                '#reminderTime': 'ReminderTime',
                 '#notificationSent': 'NotificationSent',
                 '#status': 'Status'
             },
             ExpressionAttributeValues={
-                ':due_date_short': tomorrow_short,
+                ':start_of_hour': start_of_hour_iso,
                 ':sent': False,
                 ':status_completed': 'COMPLETED'
             }
         )
-        logger.debug(f"Query response: {response}")
+        logger.info(f"Query response: {response}")
 
         for task in response['Items']:
             task_id = task.get('SK')
@@ -61,11 +64,11 @@ def lambda_handler(event, context):
                     logger.warning(f"No user details found for user ID '{user_id}'")
                     continue
 
-                logger.debug(f"User details for user ID '{user_id}': {user_details}")
+                logger.info(f"User details for user ID '{user_id}': {user_details}")
 
                 # Send email notification if enabled
                 user_email = user_details.get('Email')
-                if user_details.get('NotificationPreferences', {}).get('Email') and user_email:
+                if user_email:
                     send_email_notification(task.get('Title'), user_email)
             
                 # Create a notification entry into the db
@@ -80,7 +83,7 @@ def lambda_handler(event, context):
                 if not task_api_url:
                     logger.error('Environment variable TASK_MICROSERVICE_API_URL is not set.')
                     continue
-                update_task_notification(task_api_url, task_id, user_id)
+                update_task(task_api_url, task_id, user_id)
             
             except Exception as inner_e:
                 logger.error(f"Error processing task with ID '{task_id}' for user with ID '{user_id}': {inner_e}", exc_info=True)
@@ -102,7 +105,7 @@ def get_user_details(dynamo_table, user_id):
     Query DynamoDB for user details.
     """
     try:
-        logger.debug(f"Querying for user details with user ID '{user_id}'")
+        logger.info(f"Querying for user details with user ID '{user_id}'")
         user_response = dynamo_table.get_item(
             Key={
                 'PK': user_id,
@@ -184,7 +187,7 @@ def create_notification(notification_api_url, user_id, task_id):
     except Exception as e:
         logger.error(f"Unexpected error occurred while creating notification for user ID '{user_id}' and task ID '{task_id}': {e}", exc_info=True)
 
-def update_task_notification(task_api_url, task_id, user_id):
+def update_task(task_api_url, task_id, user_id):
     """
     Update NotificationSent field in task microservice using GraphQL mutation.
     """
@@ -193,10 +196,10 @@ def update_task_notification(task_api_url, task_id, user_id):
         return
 
     try:
-        logger.info(f"Updating task with ID '{task_id}' to set NotificationSent to true")
+        logger.info(f"Updating task with ID '{task_id}' for user with ID {user_id} to set NotificationSent to true")
         mutation = """
-        mutation UpdateTaskNotification($userId: String!, $taskId: String!) {
-          updateTask(input: { UserId: $userId, TaskId: $taskId, NotificationSent: true }) {
+        mutation UpdateTaskNotification($PK: String!, $SK: String!) {
+          updateTask(PK: $PK, SK: $SK, input: { NotificationSent: true }) {
             success
             errors {
               key
@@ -208,8 +211,8 @@ def update_task_notification(task_api_url, task_id, user_id):
         graphql_payload = {
             'query': mutation,
             'variables': {
-                'userId': user_id,
-                'taskId': task_id
+                'PK': user_id,
+                'SK': task_id,
             }
         }
         headers = {
