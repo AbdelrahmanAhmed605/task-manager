@@ -67,8 +67,6 @@ export const CreateTaskInputSchema = z
 // UpdateTaskInput schema with validations
 export const UpdateTaskInputSchema = z
   .object({
-    PK: z.string().optional().nullable(),
-    SK: z.string().min(1, "SK is required."),
     Title: z.string().optional().nullable(),
     Description: z.string().optional().nullable(),
     Status: TaskStatusEnum.optional().nullable(),
@@ -120,7 +118,5 @@ export const CreateProjectInputSchema = z.object({
 
 // UpdateProjectInput schema
 export const UpdateProjectInputSchema = z.object({
-  PK: z.string().optional().nullable(),
-  SK: z.string().min(1, "SK is required."),
   Title: z.string().min(1, "Title is required."),
 });

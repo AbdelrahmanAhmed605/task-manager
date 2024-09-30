@@ -46,9 +46,6 @@ export const Mutation = {
     }
 
     const userId = context?.user.sub;
-    input.DueDate = input.DueDate
-      ? new Date(input.DueDate).toISOString().split("T")[0]
-      : new Date(Date.now()).toISOString().split("T")[0];
 
     // Validation Checks
     const validation = CreateTaskInputSchema.safeParse(input);
@@ -60,6 +57,17 @@ export const Mutation = {
           error: err.message,
         })),
       };
+    }
+
+    input.DueDate = input.DueDate
+      ? new Date(input.DueDate).toISOString().split("T")[0]
+      : new Date(Date.now()).toISOString().split("T")[0];
+
+    // Truncate ReminderTime to remove minutes and seconds if provided
+    if (input.ReminderTime) {
+      const reminderDate = new Date(input.ReminderTime);
+      reminderDate.setMinutes(0, 0, 0); // Set minutes, seconds, and milliseconds to 0
+      input.ReminderTime = reminderDate.toISOString();
     }
 
     const taskId = uuidv4();
@@ -122,19 +130,20 @@ export const Mutation = {
   },
   updateTask: async (
     _: any,
-    { input }: { input: UpdateTaskInput },
+    { PK, SK, input }: { PK?: string; SK: string; input: UpdateTaskInput },
     context: ContextType
   ): Promise<TaskMutationResponse> => {
     if (!process.env.DYNAMODB_TABLE_NAME) {
       throw new Error("Could not connect to database");
     }
 
-    const userId = context?.user?.sub ? `USER#${context.user.sub}` : input.PK;
-    if (!userId || !input.SK) {
+    const userId =
+      PK || (context?.user?.sub ? `USER#${context.user.sub}` : undefined);
+    if (!userId || !SK) {
       throw new Error("Invalid input: userId and taskId are required.");
     }
 
-    const itemKey = { PK: userId, SK: input.SK };
+    const itemKey = { PK: userId, SK: SK };
 
     // Validation Checks using Zod schema
     const validation = UpdateTaskInputSchema.safeParse(input);
@@ -146,6 +155,13 @@ export const Mutation = {
           error: err.message,
         })),
       };
+    }
+
+    // Truncate ReminderTime to remove minutes and seconds if provided
+    if (input.ReminderTime) {
+      const reminderDate = new Date(input.ReminderTime);
+      reminderDate.setMinutes(0, 0, 0); // Set minutes, seconds, and milliseconds to 0
+      input.ReminderTime = reminderDate.toISOString();
     }
 
     // Initialize update expression and attribute values
@@ -198,27 +214,43 @@ export const Mutation = {
       UpdateExpression: updateExpression,
       ExpressionAttributeValues: marshall(expressionAttributeValues),
       ReturnValues: ReturnValue.ALL_NEW,
+      ConditionExpression: "attribute_exists(PK) AND attribute_exists(SK)",
     };
 
     if (Object.keys(expressionAttributeNames).length > 0) {
       params.ExpressionAttributeNames = expressionAttributeNames;
     }
 
-    const response = await client.send(new UpdateItemCommand(params));
-    if (!response.Attributes) {
+    try {
+      const response = await client.send(new UpdateItemCommand(params));
+
+      // Check if attributes were returned
+      if (!response.Attributes) {
+        return {
+          success: false,
+          errors: [
+            {
+              key: "UpdateError",
+              error: "No attributes returned from update operation",
+            },
+          ],
+        };
+      }
+
+      const updatedTask = unmarshall(response.Attributes) as Task;
+      return { success: true, task: updatedTask, errors: [] };
+    } catch (error: any) {
+      console.error("\n\nerror:", error);
       return {
         success: false,
         errors: [
           {
             key: "UpdateError",
-            error: "No attributes returned from update operation",
+            error: error.message || "An unexpected error occurred",
           },
         ],
       };
     }
-
-    const updatedTask = unmarshall(response.Attributes) as Task;
-    return { success: true, task: updatedTask, errors: [] };
   },
   deleteTask: async (
     _: any,
@@ -323,19 +355,19 @@ export const Mutation = {
   },
   updateProject: async (
     _: any,
-    { input }: { input: UpdateProjectInput },
+    { PK, SK, input }: { PK?: string; SK: string; input: UpdateProjectInput },
     context: ContextType
   ): Promise<ProjectMutationResponse> => {
     if (!process.env.DYNAMODB_TABLE_NAME) {
       throw new Error("Could not connect to database");
     }
 
-    const userId = context?.user?.sub ? `USER#${context.user.sub}` : input.PK;
-    if (!userId || !input.SK) {
+    const userId = context?.user?.sub ? `USER#${context.user.sub}` : PK;
+    if (!userId || !SK) {
       throw new Error("Invalid input: userId and projectId are required.");
     }
 
-    const itemKey = { PK: userId, SK: input.SK };
+    const itemKey = { PK: userId, SK: SK };
 
     // Validation Checks
     const validation = UpdateProjectInputSchema.safeParse(input);

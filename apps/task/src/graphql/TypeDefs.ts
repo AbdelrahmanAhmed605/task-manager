@@ -60,8 +60,6 @@ export const typeDefs = gql`
   }
 
   input UpdateProjectInput {
-    PK: String
-    SK: String!
     Title: String!
   }
 
@@ -77,8 +75,6 @@ export const typeDefs = gql`
   }
 
   input UpdateTaskInput {
-    PK: String
-    SK: String!
     Title: String
     Description: String
     Status: TaskStatus
@@ -119,10 +115,18 @@ export const typeDefs = gql`
 
   type Mutation {
     createTask(input: CreateTaskInput!): TaskMutationResponse
-    updateTask(input: UpdateTaskInput!): TaskMutationResponse
+    updateTask(
+      PK: String
+      SK: String!
+      input: UpdateTaskInput!
+    ): TaskMutationResponse
     deleteTask(PK: String, SK: String!): TaskMutationResponse
     createProject(input: CreateProjectInput!): ProjectMutationResponse
-    updateProject(input: UpdateProjectInput!): ProjectMutationResponse
+    updateProject(
+      PK: String
+      SK: String!
+      input: UpdateProjectInput!
+    ): ProjectMutationResponse
   }
 `;
 
@@ -164,8 +168,6 @@ export interface CreateTaskInput {
 }
 
 export interface UpdateTaskInput {
-  PK?: string;
-  SK: string;
   Title?: string;
   Description?: string;
   NotificationSent?: boolean;
@@ -208,8 +210,6 @@ export interface CreateProjectInput {
 }
 
 export interface UpdateProjectInput {
-  PK?: string;
-  SK: string;
   Title: string;
 }
 
